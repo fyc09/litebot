@@ -12,7 +12,8 @@
     "marked": "^11.1.1",
     "tdesign-vue-next": "^1.10.0",
     "tdesign-icons-vue-next": "^0.2.0",
-    "@tdesign-vue-next/chat": "0.5.0-alpha.10"
+    "@tdesign-vue-next/chat": "0.5.0-alpha.10",
+    "katex": "^0.16.28"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
