@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-FRONTEND_SRC := $(shell find frontend/src -type f) frontend/index.html frontend/vite.config.js frontend/package.json frontend/package-lock.json
+FRONTEND_SRC := $(shell find frontend/src -type f) frontend/index.html frontend/vite.config.js frontend/package.json
 FRONTEND_STAMP := iribot/static/.built
 
 .PHONY: build frontend package clean install uninstall
