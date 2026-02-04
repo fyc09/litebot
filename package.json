@@ -1,5 +1,5 @@
 {
-  "name": "agent-chat",
+  "name": "iribot",
   "version": "1.0.0",
   "description": "Full-stack AI agent with Python backend and Vue frontend"
 }

@@ -1,4 +1,4 @@
-# LiteBot - Lightweight AI Agent Chat System
+# IriBot - Lightweight AI Agent Chat System
 
 A full-featured AI agent application with tool calling capabilities and real-time conversation experience. Built with Python FastAPI backend + Vue 3 frontend full-stack architecture.
 
