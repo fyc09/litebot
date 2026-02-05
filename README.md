@@ -2,11 +2,11 @@
 
 A full-featured AI agent application with tool calling capabilities and real-time conversation experience. Built with Python FastAPI backend + Vue 3 frontend full-stack architecture.
 
-## 📦 PyPI 发布与 CLI
+## 🚀 Quick Start
 
-- 安装：pip install iribot
-- 运行：iribot --host 127.0.0.1 --port 8000
-- 构建：使用 Makefile（make build，会自动构建前端并打包到后端静态资源）
+- Install: `pip install iridet-bot`
+- Run: `iribot`
+- To specify host and port: `iribot --host 0.0.0.0 --port 8080`
 
 ## ✨ Key Features
 

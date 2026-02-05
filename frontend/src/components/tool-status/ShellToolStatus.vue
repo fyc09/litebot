@@ -34,13 +34,9 @@
               </div>
               <template v-if="session.log && session.log.length > 0">
                 <div class="logs-list">
-                  <div
-                    v-for="(log, idx) in session.log"
-                    :key="idx"
-                    class="log-entry"
-                  >
-                    <pre :class="logClass(log.stream)">{{ log.data }}</pre>
-                  </div>
+                  <pre class="log-entry">
+                    <span v-for="(log, idx) in session.log" :key="idx" :class="logClass(log.stream)">{{ log.data }}</span>
+                  </pre>
                 </div>
               </template>
               <div v-else>

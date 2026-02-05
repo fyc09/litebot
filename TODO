@@ -1,0 +1,5 @@
+1. 修复 linux 上当返回的内容结尾没有换行时无法正确获得结果
+2. 添加 Windows CMD 支持
+3. 可视化配置界面
+4. 添加 Agent Skills
+5. prompt 优化

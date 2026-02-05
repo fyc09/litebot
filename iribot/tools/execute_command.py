@@ -27,7 +27,6 @@ class ShellSession:
         
         # Use UTF-8 encoding for both Windows and Unix
         # Git Bash and Python both support UTF-8 well
-        encoding = "utf-8"
         
         # Disable colors and set simple terminal to avoid ANSI escape sequences
         env["TERM"] = "dumb"
@@ -47,11 +46,9 @@ class ShellSession:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=working_dir if working_dir else None,
-            text=True,
-            bufsize=1,
+            text=False,  # Use binary mode to avoid line buffering issues
+            bufsize=0,  # Unbuffered
             env=env,
-            encoding=encoding,
-            errors="replace",
         )
 
         self._stdout_thread = threading.Thread(
@@ -69,12 +66,34 @@ class ShellSession:
 
     def _read_stream(self, stream_name: str, stream):
         try:
-            for line in iter(stream.readline, ""):
-                if line:
-                    with self._lock:
-                        self._output.append((stream_name, line))
-                        self._log.append({"stream": stream_name, "data": line})
-                        self._output_event.set()
+            buffer = b""
+            while True:
+                byte = stream.read(1)
+                if not byte:
+                    # Stream closed
+                    if buffer:
+                        try:
+                            text = buffer.decode('utf-8', errors='replace')
+                            with self._lock:
+                                self._output.append((stream_name, text))
+                                self._log.append({"stream": stream_name, "data": text})
+                                self._output_event.set()
+                        except:
+                            pass
+                    break
+                
+                buffer += byte
+                # Flush buffer when encountering newline or reaching max size
+                if byte == b'\n' or len(buffer) >= 1024:
+                    try:
+                        text = buffer.decode('utf-8', errors='replace')
+                        with self._lock:
+                            self._output.append((stream_name, text))
+                            self._log.append({"stream": stream_name, "data": text})
+                            self._output_event.set()
+                        buffer = b""
+                    except:
+                        buffer = b""
         except Exception:
             pass
         finally:
@@ -90,7 +109,7 @@ class ShellSession:
             data += "\n"
         with self._lock:
             self._log.append({"stream": "stdin", "data": data})
-        self.process.stdin.write(data)
+        self.process.stdin.write(data.encode('utf-8'))
         self.process.stdin.flush()
 
     def read(self, wait_ms: int = 0, max_chars: int = 20000) -> Dict[str, Any]:
@@ -129,20 +148,34 @@ class ShellSession:
         if self._running_marker is None:
             return False
         
-        # Check if marker is already in the buffered output
+        # Check if marker is already in the buffered stdout
         # This handles the case where command completed but we didn't wait long enough
         with self._lock:
-            new_output = deque()
-            marker_found = False
-            for stream_name, line in self._output:
-                if self._running_marker in line:
-                    # Marker found in buffer, command has completed
-                    marker_found = True
-                    # Remove the marker line from output
-                    continue
-                new_output.append((stream_name, line))
-            
-            if marker_found:
+            stdout_text = "".join(
+                data for stream_name, data in self._output if stream_name == "stdout"
+            )
+            marker_index = stdout_text.find(self._running_marker)
+            if marker_index != -1:
+                # Remove marker from stdout buffer while preserving other output
+                stdout_without_marker = (
+                    stdout_text[:marker_index]
+                    + stdout_text[marker_index + len(self._running_marker):]
+                )
+
+                new_output = deque()
+                stdout_pos = 0
+                for stream_name, data in self._output:
+                    if stream_name == "stdout":
+                        if stdout_pos >= len(stdout_without_marker):
+                            continue
+                        take_len = min(len(data), len(stdout_without_marker) - stdout_pos)
+                        chunk = stdout_without_marker[stdout_pos:stdout_pos + take_len]
+                        stdout_pos += take_len
+                        if chunk:
+                            new_output.append((stream_name, chunk))
+                    else:
+                        new_output.append((stream_name, data))
+
                 self._output = new_output
                 self._running_marker = None
                 return False
@@ -179,38 +212,35 @@ def _collect_output_until_marker(
     all_stdout = []
     all_stderr = []
     marker_found = False
+    accumulated_stdout = ""
 
     while (time.time() * 1000 - start_time) < max_wait_time:
         output = session.read(wait_ms=100, max_chars=max_chars)
         stdout_chunk = output.get("stdout", "")
         stderr_chunk = output.get("stderr", "")
 
-        if marker in stdout_chunk:
-            # Remove the marker and everything after it (including the marker line)
-            lines = stdout_chunk.split('\n')
-            filtered_lines = []
-            for line in lines:
-                if marker in line:
-                    marker_found = True
-                    break
-                filtered_lines.append(line)
-            stdout_chunk = '\n'.join(filtered_lines)
-            # Add final newline if there were lines
-            if filtered_lines and stdout_chunk and not stdout_chunk.endswith('\n'):
-                stdout_chunk += '\n'
-
         if stdout_chunk:
-            all_stdout.append(stdout_chunk)
+            accumulated_stdout += stdout_chunk
+
         if stderr_chunk:
             all_stderr.append(stderr_chunk)
 
-        if marker_found:
-            # Clear running marker when command completes
-            session.clear_running_marker()
-            break
+        # Check for marker in accumulated output
+        if accumulated_stdout:
+            marker_index = accumulated_stdout.find(marker)
+            if marker_index != -1:
+                marker_found = True
+                all_stdout.append(accumulated_stdout[:marker_index])
+                accumulated_stdout = ""
+                session.clear_running_marker()
+                break
 
         if not stdout_chunk and not stderr_chunk:
             time.sleep(0.01)
+
+    # Add any remaining output
+    if accumulated_stdout:
+        all_stdout.append(accumulated_stdout)
 
     return "".join(all_stdout), "".join(all_stderr), marker_found
 

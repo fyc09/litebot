@@ -39,7 +39,5 @@ class Settings(BaseSettings):
     # CORS Configuration
     cors_origins: list = []
 
-print(Settings.model_config)
-
 
 settings = Settings()
