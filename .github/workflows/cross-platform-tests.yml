@@ -43,7 +43,7 @@ jobs:
     - name: Check for coverage file
       run: |
         if [ -f .coverage ]; then
-          mv .coverage .coverage.linux-py${{ matrix.python-version }}
+          mv .coverage coverage.linux-py${{ matrix.python-version }}
           echo "Coverage file renamed successfully"
         else
           echo "ERROR: .coverage file not found after pytest"
@@ -53,13 +53,13 @@ jobs:
     - name: Verify coverage file before upload
       run: |
         echo "=== Checking file before upload ==="
-        ls -la .coverage.linux-py${{ matrix.python-version }}
+        ls -la coverage.linux-py${{ matrix.python-version }}
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
         name: coverage-linux-py${{ matrix.python-version }}
-        path: ./.coverage.linux-py${{ matrix.python-version }}
+        path: coverage.linux-py${{ matrix.python-version }}
         retention-days: 1
 
   test-macos:
@@ -97,7 +97,7 @@ jobs:
     - name: Check for coverage file
       run: |
         if [ -f .coverage ]; then
-          mv .coverage .coverage.macos-py${{ matrix.python-version }}
+          mv .coverage coverage.macos-py${{ matrix.python-version }}
           echo "Coverage file renamed successfully"
         else
           echo "ERROR: .coverage file not found after pytest"
@@ -107,13 +107,13 @@ jobs:
     - name: Verify coverage file before upload
       run: |
         echo "=== Checking file before upload ==="
-        ls -la .coverage.macos-py${{ matrix.python-version }}
+        ls -la coverage.macos-py${{ matrix.python-version }}
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
         name: coverage-macos-py${{ matrix.python-version }}
-        path: ./.coverage.macos-py${{ matrix.python-version }}
+        path: coverage.macos-py${{ matrix.python-version }}
         retention-days: 1
 
   test-windows-cmd:
@@ -152,7 +152,7 @@ jobs:
         Get-ChildItem -Path . -Filter "htmlcov" | ForEach-Object { Write-Host $_.FullName }
         if (Test-Path .coverage) {
           Write-Host "Found .coverage file"
-          Move-Item .coverage ".coverage.windows-cmd-py${{ matrix.python-version }}"
+          Move-Item .coverage "coverage.windows-cmd-py${{ matrix.python-version }}"
           Write-Host "Coverage file renamed successfully"
         } else {
           Write-Host "ERROR: .coverage file not found"
@@ -163,13 +163,13 @@ jobs:
       shell: powershell
       run: |
         Write-Host "=== Checking file before upload ==="
-        Get-ChildItem -Path ".coverage.windows-cmd-py${{ matrix.python-version }}" | Format-List
+        Get-ChildItem -Path "coverage.windows-cmd-py${{ matrix.python-version }}" | Format-List
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
         name: coverage-windows-cmd-py${{ matrix.python-version }}
-        path: ./.coverage.windows-cmd-py${{ matrix.python-version }}
+        path: coverage.windows-cmd-py${{ matrix.python-version }}
         retention-days: 1
 
   test-windows-bash:
@@ -217,7 +217,7 @@ jobs:
       shell: bash
       run: |
         if [ -f .coverage ]; then
-          mv .coverage .coverage.windows-bash-py${{ matrix.python-version }}
+          mv .coverage coverage.windows-bash-py${{ matrix.python-version }}
           echo "Coverage file renamed successfully"
         else
           echo "ERROR: .coverage file not found after pytest"
@@ -228,13 +228,13 @@ jobs:
       shell: bash
       run: |
         echo "=== Checking file before upload ==="
-        ls -la .coverage.windows-bash-py${{ matrix.python-version }}
+        ls -la coverage.windows-bash-py${{ matrix.python-version }}
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
       with:
         name: coverage-windows-bash-py${{ matrix.python-version }}
-        path: ./.coverage.windows-bash-py${{ matrix.python-version }}
+        path: coverage.windows-bash-py${{ matrix.python-version }}
         retention-days: 1
 
   # Combine coverage from all platforms
@@ -279,7 +279,19 @@ jobs:
     - name: List coverage files
       run: |
         echo "=== Downloaded coverage files ==="
-        ls -la .coverage.* || echo "No coverage files found"
+        ls -la coverage.* || echo "No coverage files found"
+
+    - name: Rename files for coverage combine
+      run: |
+        echo "=== Renaming files to .coverage.* format ==="
+        for file in coverage.*; do
+          if [ -f "$file" ]; then
+            newname=".${file}"
+            mv "$file" "$newname"
+            echo "Renamed $file to $newname"
+          fi
+        done
+        ls -la .coverage.* || echo "No .coverage files after rename"
 
     - name: Create coverage config for combining
       run: |
