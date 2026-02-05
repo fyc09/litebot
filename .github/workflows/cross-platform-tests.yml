@@ -33,27 +33,14 @@ jobs:
       run: |
         pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: List coverage files
-      run: |
-        echo "=== Current directory contents ==="
-        ls -la
-        echo "=== Looking for coverage files ==="
-        find . -maxdepth 1 -type f -name ".coverage*" -o -name "*.xml" -o -name "htmlcov" 2>/dev/null | head -20
-
-    - name: Check for coverage file
+    - name: Rename coverage file
       run: |
         if [ -f .coverage ]; then
           mv .coverage coverage.linux-py${{ matrix.python-version }}
-          echo "Coverage file renamed successfully"
         else
           echo "ERROR: .coverage file not found after pytest"
           exit 1
         fi
-
-    - name: Verify coverage file before upload
-      run: |
-        echo "=== Checking file before upload ==="
-        ls -la coverage.linux-py${{ matrix.python-version }}
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -87,27 +74,14 @@ jobs:
       run: |
         pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: List coverage files
-      run: |
-        echo "=== Current directory contents ==="
-        ls -la
-        echo "=== Looking for coverage files ==="
-        find . -maxdepth 1 -type f -name ".coverage*" -o -name "*.xml" -o -name "htmlcov" 2>/dev/null | head -20
-
-    - name: Check for coverage file
+    - name: Rename coverage file
       run: |
         if [ -f .coverage ]; then
           mv .coverage coverage.macos-py${{ matrix.python-version }}
-          echo "Coverage file renamed successfully"
         else
           echo "ERROR: .coverage file not found after pytest"
           exit 1
         fi
-
-    - name: Verify coverage file before upload
-      run: |
-        echo "=== Checking file before upload ==="
-        ls -la coverage.macos-py${{ matrix.python-version }}
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -144,26 +118,15 @@ jobs:
       run: |
         pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: Check for coverage file
+    - name: Rename coverage file
       shell: powershell
       run: |
-        Write-Host "=== Checking for coverage files ==="
-        Get-ChildItem -Path . -Filter ".coverage*" | ForEach-Object { Write-Host $_.FullName }
-        Get-ChildItem -Path . -Filter "htmlcov" | ForEach-Object { Write-Host $_.FullName }
         if (Test-Path .coverage) {
-          Write-Host "Found .coverage file"
           Move-Item .coverage "coverage.windows-cmd-py${{ matrix.python-version }}"
-          Write-Host "Coverage file renamed successfully"
         } else {
           Write-Host "ERROR: .coverage file not found"
           exit 1
         }
-
-    - name: Verify coverage file before upload
-      shell: powershell
-      run: |
-        Write-Host "=== Checking file before upload ==="
-        Get-ChildItem -Path "coverage.windows-cmd-py${{ matrix.python-version }}" | Format-List
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -205,30 +168,15 @@ jobs:
       run: |
         pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: List coverage files
-      shell: bash
-      run: |
-        echo "=== Current directory contents ==="
-        ls -la
-        echo "=== Looking for coverage files ==="
-        find . -maxdepth 1 -type f -name ".coverage*" -o -name "*.xml" -o -name "htmlcov" 2>/dev/null | head -20
-
     - name: Rename coverage file
       shell: bash
       run: |
         if [ -f .coverage ]; then
           mv .coverage coverage.windows-bash-py${{ matrix.python-version }}
-          echo "Coverage file renamed successfully"
         else
           echo "ERROR: .coverage file not found after pytest"
           exit 1
         fi
-
-    - name: Verify coverage file before upload
-      shell: bash
-      run: |
-        echo "=== Checking file before upload ==="
-        ls -la coverage.windows-bash-py${{ matrix.python-version }}
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -340,13 +288,11 @@ jobs:
     - name: Upload combined coverage to Codecov
       if: steps.check-tests.outputs.tests_passed == 'true'
       uses: codecov/codecov-action@v4
-      continue-on-error: true
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: coverage-combined.xml
         flags: combined
         name: combined-coverage
-        fail_ci_if_error: false
         verbose: true
 
     - name: Upload combined HTML report
