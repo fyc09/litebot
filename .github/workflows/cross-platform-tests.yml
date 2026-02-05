@@ -31,11 +31,24 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: Rename coverage file
+    - name: List coverage files
       run: |
-        mv .coverage .coverage.linux-py${{ matrix.python-version }}
+        echo "=== Current directory contents ==="
+        ls -la
+        echo "=== Looking for coverage files ==="
+        find . -maxdepth 1 -type f -name ".coverage*" -o -name "*.xml" -o -name "htmlcov" 2>/dev/null | head -20
+
+    - name: Check for coverage file
+      run: |
+        if [ -f .coverage ]; then
+          mv .coverage .coverage.linux-py${{ matrix.python-version }}
+          echo "Coverage file renamed successfully"
+        else
+          echo "ERROR: .coverage file not found after pytest"
+          exit 1
+        fi
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -67,11 +80,24 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: Rename coverage file
+    - name: List coverage files
       run: |
-        mv .coverage .coverage.macos-py${{ matrix.python-version }}
+        echo "=== Current directory contents ==="
+        ls -la
+        echo "=== Looking for coverage files ==="
+        find . -maxdepth 1 -type f -name ".coverage*" -o -name "*.xml" -o -name "htmlcov" 2>/dev/null | head -20
+
+    - name: Check for coverage file
+      run: |
+        if [ -f .coverage ]; then
+          mv .coverage .coverage.macos-py${{ matrix.python-version }}
+          echo "Coverage file renamed successfully"
+        else
+          echo "ERROR: .coverage file not found after pytest"
+          exit 1
+        fi
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -106,12 +132,22 @@ jobs:
       env:
         SHELL_TYPE: cmd
       run: |
-        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
 
-    - name: Rename coverage file
+    - name: Check for coverage file
       shell: powershell
       run: |
-        Move-Item .coverage ".coverage.windows-cmd-py${{ matrix.python-version }}"
+        Write-Host "=== Checking for coverage files ==="
+        Get-ChildItem -Path . -Filter ".coverage*" | ForEach-Object { Write-Host $_.FullName }
+        Get-ChildItem -Path . -Filter "htmlcov" | ForEach-Object { Write-Host $_.FullName }
+        if (Test-Path .coverage) {
+          Write-Host "Found .coverage file"
+          Move-Item .coverage ".coverage.windows-cmd-py${{ matrix.python-version }}"
+          Write-Host "Coverage file renamed successfully"
+        } else {
+          Write-Host "ERROR: .coverage file not found"
+          exit 1
+        }
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
@@ -151,12 +187,26 @@ jobs:
       env:
         SHELL_TYPE: bash
       run: |
-        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=html --cov-report=xml --cov-report=term-missing --cov-branch
+
+    - name: List coverage files
+      shell: bash
+      run: |
+        echo "=== Current directory contents ==="
+        ls -la
+        echo "=== Looking for coverage files ==="
+        find . -maxdepth 1 -type f -name ".coverage*" -o -name "*.xml" -o -name "htmlcov" 2>/dev/null | head -20
 
     - name: Rename coverage file
       shell: bash
       run: |
-        mv .coverage .coverage.windows-bash-py${{ matrix.python-version }}
+        if [ -f .coverage ]; then
+          mv .coverage .coverage.windows-bash-py${{ matrix.python-version }}
+          echo "Coverage file renamed successfully"
+        else
+          echo "ERROR: .coverage file not found after pytest"
+          exit 1
+        fi
 
     - name: Upload coverage artifact
       uses: actions/upload-artifact@v4
