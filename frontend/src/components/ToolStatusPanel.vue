@@ -27,6 +27,10 @@
           v-if="tool.name === 'shell'"
           :status="tool"
         />
+        <SkillToolStatus
+          v-else-if="tool.name === 'skills'"
+          :status="tool"
+        />
         <DefaultToolStatus v-else :status="tool" />
       </t-collapse-panel>
     </t-collapse>
@@ -36,6 +40,7 @@
 <script setup>
 import { ref } from "vue";
 import ShellToolStatus from "./tool-status/ShellToolStatus.vue";
+import SkillToolStatus from "./tool-status/SkillToolStatus.vue";
 import DefaultToolStatus from "./tool-status/DefaultToolStatus.vue";
 
 defineProps({

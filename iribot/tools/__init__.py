@@ -11,6 +11,7 @@ from .execute_command import (
 from .read_file import ReadFileTool
 from .write_file import WriteFileTool
 from .list_directory import ListDirectoryTool
+from .skills import UseSkillTool
 
 __all__ = [
     'BaseTool',
@@ -24,4 +25,6 @@ __all__ = [
     'ReadFileTool',
     'WriteFileTool',
     'ListDirectoryTool',
+
+    'UseSkillTool',
 ]

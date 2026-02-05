@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from .executor import tool_executor
+import os
 
 
 # Initialize Jinja2 Environment
@@ -77,6 +78,88 @@ def get_available_tools_description() -> str:
     return tools_description
 
 
+def get_available_skills_description() -> str:
+    """
+    Get descriptions of all available skills for the prompt
+    
+    Returns:
+        Formatted string describing all available skills
+    """
+    skills_dir = Path(os.getcwd()) / "skills"
+    
+    if not skills_dir.exists():
+        return "## Available Skills\n\nNo skills directory found.\n"
+    
+    skills_description = "## Available Skills\n\n"
+    skills_found = False
+    
+    # Iterate through all skill directories
+    for skill_dir in skills_dir.iterdir():
+        if skill_dir.is_dir():
+            skill_md = skill_dir / "SKILL.md"
+            if skill_md.exists():
+                try:
+                    with open(skill_md, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Extract YAML front matter if present
+                    yaml_content = ""
+                    markdown_content = content
+                    if content.startswith('---'):
+                        parts = content.split('---', 2)
+                        if len(parts) >= 2:
+                            yaml_content = parts[1].strip()
+                            markdown_content = parts[2].strip() if len(parts) > 2 else ""
+                    
+                    # Extract title and description from YAML front matter first
+                    title = ""
+                    description = ""
+                    if yaml_content:
+                        for yaml_line in yaml_content.split('\n'):
+                            yaml_line = yaml_line.strip()
+                            if yaml_line.lower().startswith('title:'):
+                                title = yaml_line.split(':', 1)[1].strip().strip('"').strip("'")
+                            elif yaml_line.lower().startswith('description:'):
+                                description = yaml_line.split(':', 1)[1].strip().strip('"').strip("'")
+                    
+                    # Fallback: extract title from first markdown header
+                    lines = markdown_content.split('\n')
+                    if not title:
+                        for line in lines:
+                            line = line.strip()
+                            if line.startswith('# '):
+                                title = line[2:].strip()
+                                break
+                    
+                    # Fallback: use directory name as title
+                    if not title:
+                        title = skill_dir.name
+
+                    # Fallback: use first paragraph in markdown as description
+                    if not description:
+                        for line in lines:
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                description = line
+                                break
+
+                    # Add skill info to description
+                    skills_description += f"### {skill_dir.name}\n"
+                    skills_description += f"**Title:** {title}\n"
+                    if description:
+                        skills_description += f"**Description:** {description}\n"
+                    skills_description += f"**Location:** skills/{skill_dir.name}/SKILL.md\n"
+                    skills_description += "\n"
+                    skills_found = True
+                except Exception:
+                    continue
+    
+    if not skills_found:
+        skills_description += "No skills found.\n"
+    
+    return skills_description
+
+
 def generate_system_prompt(custom_instructions: str = "") -> str:
     """
     Generate a system prompt for the Agent using Jinja2 template
@@ -89,6 +172,7 @@ def generate_system_prompt(custom_instructions: str = "") -> str:
     """
     datetime_info = get_current_datetime_info()
     tools_desc = get_available_tools_description()
+    skills_desc = get_available_skills_description()
     
     # Load and render template
     template = jinja_env.get_template("system_prompt.j2")
@@ -98,6 +182,7 @@ def generate_system_prompt(custom_instructions: str = "") -> str:
         current_local=datetime_info['current_local'],
         timezone=datetime_info['timezone'],
         tools_description=tools_desc,
+        skills_description=skills_desc,
         custom_instructions=custom_instructions
     )
     

@@ -84,6 +84,26 @@ def generate_prompt_get(custom_instructions: str = ""):
     )
 
 
+@app.get("/api/prompt/text")
+def generate_prompt_text(custom_instructions: str = ""):
+    """
+    Generate a system prompt and return as plain text
+    
+    Query Parameters:
+        custom_instructions: Optional custom instructions
+        
+    Returns:
+        Plain text system prompt
+    """
+    from fastapi.responses import PlainTextResponse
+    
+    prompt = generate_system_prompt(
+        custom_instructions=custom_instructions
+    )
+    
+    return PlainTextResponse(content=prompt)
+
+
 @app.post("/api/sessions")
 def create_session(request: SessionCreate):
     """Create a new chat session"""

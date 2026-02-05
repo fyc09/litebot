@@ -31,6 +31,7 @@ venv.bk/
 # IDE
 .vscode/
 .idea/
+.trae/
 *.swp
 *.swo
 *~
@@ -56,7 +57,7 @@ iribot/static/
 
 # Session and logs
 sessions/
-skills/
+/skills/
 *.log
 *.pid
 

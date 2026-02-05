@@ -5,28 +5,32 @@ from .tools.execute_command import ShellToolGroup, ShellStatus
 from .tools.read_file import ReadFileTool
 from .tools.write_file import WriteFileTool
 from .tools.list_directory import ListDirectoryTool
+from .tools.skills import UseSkillTool
+from .tools.skills_status import SkillsStatus
 
 
 class ToolExecutor:
     """Manages and executes tools"""
-    
+
     def __init__(self):
         self.tools: Dict[str, BaseTool] = {}
         self.statuses: Dict[str, BaseStatus] = {}
         self._register_default_tools()
-    
+
     def _register_default_tools(self) -> None:
         """Register all default tools"""
         default_tools = [
             ReadFileTool(),
             WriteFileTool(),
             ListDirectoryTool(),
+            UseSkillTool(),
         ]
         for tool in default_tools:
             self.register_tool(tool)
 
         self.register_tool_group(ShellToolGroup())
         self.register_status(ShellStatus())
+        self.register_status(SkillsStatus())
     
     def register_tool(self, tool: BaseTool) -> None:
         """Register a new tool"""

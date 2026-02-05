@@ -388,6 +388,7 @@ class ShellRunTool(BaseTool):
                 "wait_ms": {
                     "type": "integer",
                     "description": "Max wait time in milliseconds for command completion",
+                    "default": 10000,
                 },
                 "max_chars": {
                     "type": "integer",

@@ -48,6 +48,12 @@
       :result="toolData.result"
       :success="toolData.success"
     />
+    <UseSkillCall
+      v-else-if="toolData.funcName === 'use_skill'"
+      :args="toolData.args"
+      :result="toolData.result"
+      :success="toolData.success"
+    />
     <div v-else class="unknown-tool">
       <p>Unknown tool: {{ toolData.funcName }}</p>
       <pre>{{ JSON.stringify(toolData, null, 2) }}</pre>
@@ -64,6 +70,7 @@ import ShellStopCall from "./tool-calls/ShellStopCall.vue";
 import ReadFileCall from "./tool-calls/ReadFileCall.vue";
 import WriteFileCall from "./tool-calls/WriteFileCall.vue";
 import ListDirectoryCall from "./tool-calls/ListDirectoryCall.vue";
+import UseSkillCall from "./tool-calls/UseSkillCall.vue";
 
 defineProps({
   toolData: {
