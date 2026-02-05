@@ -3,7 +3,7 @@ SHELL := /bin/bash
 FRONTEND_SRC := $(shell find frontend/src -type f) frontend/index.html frontend/vite.config.js frontend/package.json
 FRONTEND_STAMP := iribot/static/.built
 
-.PHONY: build frontend package clean install uninstall
+.PHONY: build frontend package clean install uninstall test test-cov test-html
 
 build: frontend package
 
@@ -29,4 +29,15 @@ uninstall:
 	python -m pip uninstall -y iribot
 
 clean:
-	rm -rf dist build *.egg-info iribot/static
+	rm -rf dist build *.egg-info iribot/static htmlcov .coverage .coverage.* .pytest_cache
+
+# Testing
+test:
+	python -m pytest tests/ -v --tb=short
+
+test-cov:
+	python -m pytest tests/ --cov=iribot --cov-report=term-missing
+
+test-html:
+	python -m pytest tests/ --cov=iribot --cov-report=html
+	@echo "Coverage report: htmlcov/index.html"

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     
     # Shell Configuration
     bash_path: str = "bash"  # Path to bash executable, defaults to "bash" in PATH
+    shell_type: str = "auto"  # Shell type: "auto", "bash", "cmd". "auto" detects based on availability
     
     # CORS Configuration
     cors_origins: list = []

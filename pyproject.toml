@@ -20,6 +20,13 @@ dependencies = [
   "jinja2>=3.0.0",
 ]
 
+[project.optional-dependencies]
+test = [
+  "pytest>=7.0.0",
+  "pytest-cov>=4.0.0",
+  "pytest-timeout>=2.1.0",
+]
+
 [project.scripts]
 iribot = "iribot.cli:main"
 
@@ -29,3 +36,38 @@ include = ["iribot*"]
 
 [tool.setuptools.package-data]
 iribot = ["templates/*.j2", "static/**", ".env.example"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v --strict-markers --tb=short"
+markers = [
+  "slow: marks tests as slow",
+  "windows_only: marks tests as Windows-specific",
+  "unix_only: marks tests as Unix-specific",
+]
+[tool.coverage.run]
+source = ["iribot"]
+parallel = true
+relative_files = true
+branch = true
+
+[tool.coverage.paths]
+source = [
+  "iribot/",
+  "D:\\a\\iribot\\iribot\\iribot\\",
+  "/home/runner/work/iribot/iribot/iribot/",
+  "/Users/runner/work/iribot/iribot/iribot/",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "def __repr__",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]

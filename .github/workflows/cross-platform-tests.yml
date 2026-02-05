@@ -1,0 +1,300 @@
+name: Cross-Platform Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    name: Test Linux (Bash) - Python ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Run tests with coverage
+      run: |
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+
+    - name: Rename coverage file
+      run: |
+        mv .coverage .coverage.linux-py${{ matrix.python-version }}
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-linux-py${{ matrix.python-version }}
+        path: .coverage.linux-py${{ matrix.python-version }}
+        retention-days: 1
+
+  test-macos:
+    runs-on: macos-latest
+    name: Test macOS (Bash) - Python ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Run tests with coverage
+      run: |
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+
+    - name: Rename coverage file
+      run: |
+        mv .coverage .coverage.macos-py${{ matrix.python-version }}
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-macos-py${{ matrix.python-version }}
+        path: .coverage.macos-py${{ matrix.python-version }}
+        retention-days: 1
+
+  test-windows-cmd:
+    runs-on: windows-latest
+    name: Test Windows (CMD) - Python ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Run tests with coverage (CMD)
+      shell: cmd
+      env:
+        SHELL_TYPE: cmd
+      run: |
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+
+    - name: Rename coverage file
+      shell: powershell
+      run: |
+        Move-Item .coverage ".coverage.windows-cmd-py${{ matrix.python-version }}"
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-windows-cmd-py${{ matrix.python-version }}
+        path: .coverage.windows-cmd-py${{ matrix.python-version }}
+        retention-days: 1
+
+  test-windows-bash:
+    runs-on: windows-latest
+    name: Test Windows (Git Bash) - Python ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install Git (includes Bash)
+      run: |
+        choco install git.install -y --params="/GitAndUnixToolsOnPath"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[test]"
+
+    - name: Run tests with coverage (Bash)
+      shell: bash
+      env:
+        SHELL_TYPE: bash
+      run: |
+        pytest tests/ -v --tb=short --cov=iribot --cov-report=xml --cov-report=term-missing
+
+    - name: Rename coverage file
+      shell: bash
+      run: |
+        mv .coverage .coverage.windows-bash-py${{ matrix.python-version }}
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-windows-bash-py${{ matrix.python-version }}
+        path: .coverage.windows-bash-py${{ matrix.python-version }}
+        retention-days: 1
+
+  # Combine coverage from all platforms
+  coverage-combine:
+    needs: [test-linux, test-macos, test-windows-cmd, test-windows-bash]
+    runs-on: ubuntu-latest
+    name: Combine Coverage
+    if: always() && !cancelled()
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install coverage tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install coverage[toml] pytest-cov
+
+    - name: Download all coverage artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*
+        merge-multiple: true
+
+    - name: List coverage files
+      run: |
+        echo "=== Downloaded coverage files ==="
+        ls -la .coverage.* || echo "No coverage files found"
+
+    - name: Create coverage config for combining
+      run: |
+        cat > .coveragerc << 'EOF'
+        [run]
+        source = iribot
+        parallel = true
+        relative_files = true
+
+        [paths]
+        source =
+            iribot/
+            D:\a\iribot\iribot\iribot\
+            /home/runner/work/iribot/iribot/iribot/
+            /Users/runner/work/iribot/iribot/iribot/
+        EOF
+
+    - name: Combine coverage data
+      run: |
+        echo "=== Combining coverage from all platforms ==="
+        coverage combine .coverage.* || echo "Some coverage files may be missing"
+        
+    - name: Generate combined coverage report
+      run: |
+        echo "=== Combined Coverage Report ==="
+        coverage report --show-missing
+        
+    - name: Generate HTML report
+      run: |
+        coverage html
+        echo "HTML report generated in htmlcov/"
+
+    - name: Generate XML report for Codecov
+      run: |
+        coverage xml -o coverage-combined.xml
+
+    - name: Upload combined coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: coverage-combined.xml
+        flags: combined
+        name: combined-coverage
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Upload combined HTML report
+      uses: actions/upload-artifact@v4
+      with:
+        name: combined-coverage-report
+        path: htmlcov/
+        retention-days: 30
+
+    - name: Coverage summary
+      run: |
+        echo "## Combined Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Coverage data combined from all platforms:" >> $GITHUB_STEP_SUMMARY
+        echo "- Linux (Bash)" >> $GITHUB_STEP_SUMMARY
+        echo "- macOS (Bash)" >> $GITHUB_STEP_SUMMARY
+        echo "- Windows (CMD)" >> $GITHUB_STEP_SUMMARY
+        echo "- Windows (Git Bash)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        coverage report >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # Final test summary
+  test-summary:
+    needs: [test-linux, test-macos, test-windows-cmd, test-windows-bash, coverage-combine]
+    runs-on: ubuntu-latest
+    name: Test Summary
+    if: always()
+
+    steps:
+    - name: Check test results
+      run: |
+        echo "=== Cross-Platform Test Summary ==="
+        echo "Linux (Bash): ${{ needs.test-linux.result }}"
+        echo "macOS (Bash): ${{ needs.test-macos.result }}"
+        echo "Windows (CMD): ${{ needs.test-windows-cmd.result }}"
+        echo "Windows (Bash): ${{ needs.test-windows-bash.result }}"
+        echo "Coverage Combine: ${{ needs.coverage-combine.result }}"
+        
+        if [[ "${{ needs.test-linux.result }}" == "failure" ]] || \
+           [[ "${{ needs.test-macos.result }}" == "failure" ]] || \
+           [[ "${{ needs.test-windows-cmd.result }}" == "failure" ]] || \
+           [[ "${{ needs.test-windows-bash.result }}" == "failure" ]]; then
+          echo "Some tests failed"
+          exit 1
+        fi
+        echo "All tests passed"
+
+    - name: Generate summary
+      run: |
+        echo "## Cross-Platform Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Linux (Bash) | ${{ needs.test-linux.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| macOS (Bash) | ${{ needs.test-macos.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Windows (CMD) | ${{ needs.test-windows-cmd.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Windows (Bash) | ${{ needs.test-windows-bash.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Combined Coverage | ${{ needs.coverage-combine.result }} |" >> $GITHUB_STEP_SUMMARY

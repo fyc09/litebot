@@ -5,10 +5,65 @@ import platform
 import threading
 import time
 import uuid
+import shutil
 from collections import deque
 from typing import Any, Dict, Optional, Deque, Tuple, List
 from .base import BaseTool, BaseToolGroup, BaseStatus
 from ..config import settings
+
+
+def _detect_shell_type() -> str:
+    """Detect available shell type on the system."""
+    # Check if bash is available
+    bash_path = shutil.which("bash")
+    if bash_path:
+        return "bash"
+    
+    # Fall back to cmd on Windows
+    if platform.system() == "Windows":
+        return "cmd"
+    
+    # Fall back to sh on Unix-like systems
+    sh_path = shutil.which("sh")
+    if sh_path:
+        return "sh"
+    
+    # Default to bash
+    return "bash"
+
+
+def _get_shell_config() -> Tuple[str, List[str]]:
+    """Get shell executable and arguments based on configuration.
+    
+    Returns:
+        Tuple of (executable_path, command_args_list)
+    """
+    shell_type = settings.shell_type
+    
+    # Auto-detect if shell_type is "auto"
+    if shell_type == "auto":
+        shell_type = _detect_shell_type()
+    
+    if shell_type == "cmd":
+        # Windows CMD
+        return "cmd.exe", ["/Q"]  # /Q disables echo
+    elif shell_type == "bash":
+        # Use configured bash path or find bash
+        bash_cmd = settings.bash_path
+        if not os.path.exists(bash_cmd) and bash_cmd == "bash":
+            # Try to find bash if it's just "bash"
+            bash_found = shutil.which("bash")
+            if bash_found:
+                bash_cmd = bash_found
+        return bash_cmd, ["--norc", "--noprofile"]
+    else:
+        # Fallback to bash
+        bash_cmd = settings.bash_path
+        if not os.path.exists(bash_cmd) and bash_cmd == "bash":
+            bash_found = shutil.which("bash")
+            if bash_found:
+                bash_cmd = bash_found
+        return bash_cmd, ["--norc", "--noprofile"]
 
 
 class ShellSession:
@@ -34,11 +89,9 @@ class ShellSession:
         env["NO_COLOR"] = "1"  # Disable colors in many tools
         env["PYTHONUNBUFFERED"] = "1"  # Disable Python output buffering
         
-        # Always use bash, get path from config
-        bash_cmd = settings.bash_path
-        # Use --norc --noprofile to avoid loading user configs that add colors
-        # Don't use -i to avoid "no job control" warnings in non-TTY environment
-        cmd = [bash_cmd, "--norc", "--noprofile"]
+        # Get shell executable and arguments
+        shell_exe, shell_args = _get_shell_config()
+        cmd = [shell_exe] + shell_args
 
         self.process = subprocess.Popen(
             cmd,
@@ -267,7 +320,7 @@ def _get_sessions_status() -> List[Dict[str, Any]]:
 
 
 class ShellStartTool(BaseTool):
-    """Start a persistent shell session"""
+    """Start a persistent shell session (bash or cmd depending on system)"""
 
     @property
     def name(self) -> str:
@@ -275,7 +328,7 @@ class ShellStartTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Start a persistent bash shell session."
+        return "Start a persistent shell session. On Windows, uses cmd.exe if bash is unavailable; on Unix-like systems, uses bash or sh."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -317,7 +370,7 @@ class ShellRunTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Run a command in a persistent bash session. **IMPORTANT**: If 'background' is set to true, the command will run in the background and the tool will return immediately. This will occupy the shell session; start a new session for other commands."
+        return "Run a command in a persistent shell session (bash or cmd). **IMPORTANT**: If 'background' is set to true, the command will run in the background and the tool will return immediately. This will occupy the shell session; start a new session for other commands."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -427,7 +480,7 @@ class ShellWriteTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Write input to stdin of a persistent bash session."
+        return "Write input to stdin of a persistent shell session (bash or cmd)."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -474,7 +527,7 @@ class ShellReadTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Read buffered output from a persistent bash session."
+        return "Read buffered output from a persistent shell session (bash or cmd)."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -530,7 +583,7 @@ class ShellStopTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Stop a persistent bash session."
+        return "Stop a persistent shell session (bash or cmd)."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -571,7 +624,7 @@ class ShellToolGroup(BaseToolGroup):
 
     @property
     def description(self) -> str:
-        return "Persistent bash shell tools."
+        return "Persistent shell tools (bash or cmd depending on system availability)."
 
     def get_tools(self) -> List[BaseTool]:
         return [
@@ -592,11 +645,13 @@ class ShellStatus(BaseStatus):
 
     @property
     def description(self) -> str:
-        return "Persistent bash shell status."
+        return "Persistent shell (bash/cmd) status."
 
     def get_status(self) -> Dict[str, Any]:
+        shell_exe, _ = _get_shell_config()
         return {
             "name": self.name,
             "status": "ok",
+            "shell_executable": shell_exe,
             "sessions": _get_sessions_status(),
         }

@@ -1,5 +1,6 @@
-1. 修复 linux 上当返回的内容结尾没有换行时无法正确获得结果
-2. 添加 Windows CMD 支持
+1. <DONE> 修复 linux 上当返回的内容结尾没有换行时无法正确获得结果
+2. <DONE> 添加 Windows CMD 支持
 3. 可视化配置界面
 4. 添加 Agent Skills
 5. prompt 优化
+6. <DONE> 编写 pytest，用于测试 tools，并编写 workflow 在各个平台自动运行（bash on Linux/MacOS, cmd on Windows, bash on Windows）
