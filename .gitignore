@@ -58,6 +58,7 @@ iribot/static/
 # Session and logs
 sessions/
 /skills/
+.agents/
 *.log
 *.pid
 

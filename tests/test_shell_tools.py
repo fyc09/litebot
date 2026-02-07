@@ -2,6 +2,7 @@
 import pytest
 import time
 import platform
+from pathlib import Path
 from iribot.tools.execute_command import (
     ShellStartTool,
     ShellRunTool,
@@ -12,6 +13,12 @@ from iribot.tools.execute_command import (
     _detect_shell_type,
     _get_shell_config,
 )
+
+
+def get_outputs_dir() -> Path:
+    outputs_dir = Path.cwd() / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    return outputs_dir
 
 
 class TestShellDetection:
@@ -82,6 +89,7 @@ class TestShellSession:
 class TestShellTools:
     """Test shell tool classes"""
 
+
     def test_shell_start_tool(self, shell_session_id):
         """Test ShellStartTool"""
         tool = ShellStartTool()
@@ -98,12 +106,11 @@ class TestShellTools:
         start_tool.execute(session_id=shell_session_id)
 
         # Run a command
-        run_tool = ShellRunTool()
+        run_tool = ShellRunTool(get_outputs_dir())
         result = run_tool.execute(
             session_id=shell_session_id,
             command="echo 'hello'",
             wait_ms=5000,
-            background=False,
         )
 
         assert result["success"] is True
@@ -116,13 +123,12 @@ class TestShellTools:
         start_tool.execute(session_id=shell_session_id)
 
         # Run a command that produces stderr
-        run_tool = ShellRunTool()
+        run_tool = ShellRunTool(get_outputs_dir())
         # Use python to ensure cross-platform compatibility
         result = run_tool.execute(
             session_id=shell_session_id,
             command='python -c "import sys; sys.stderr.write(\'error message\')"',
             wait_ms=5000,
-            background=False,
         )
 
         assert result["success"] is True
@@ -147,9 +153,9 @@ class TestShellTools:
 
         # Read from shell
         time.sleep(0.2)
-        read_tool = ShellReadTool()
+        read_tool = ShellReadTool(get_outputs_dir())
         result = read_tool.execute(
-            session_id=shell_session_id, wait_ms=2000, max_chars=10000
+            session_id=shell_session_id, wait_ms=3000, max_chars=10000
         )
         assert result["success"] is True
 
@@ -173,17 +179,46 @@ class TestShellTools:
         start_tool.execute(session_id=shell_session_id)
 
         # Run a command in background
-        run_tool = ShellRunTool()
+        run_tool = ShellRunTool(get_outputs_dir())
         result = run_tool.execute(
             session_id=shell_session_id,
             command="echo 'background'",
             wait_ms=3000,
-            background=True,
         )
 
         assert result["success"] is True
-        # Background command may or may not be completed
-        assert result["status"] in ["running", "completed"]
+        assert result["end_reason"] in ["completed", "timeout"]
+
+    def test_shell_run_tool_timeout(self, shell_session_id):
+        """Test ShellRunTool timeout handling"""
+        start_tool = ShellStartTool()
+        start_tool.execute(session_id=shell_session_id)
+
+        run_tool = ShellRunTool(get_outputs_dir())
+        result = run_tool.execute(
+            session_id=shell_session_id,
+            command='python -c "import time; time.sleep(4); print(\"done\")"',
+            wait_ms=3000,
+        )
+
+        assert result["success"] is False
+        assert result["end_reason"] == "timeout"
+        assert "timed out" in result.get("error", "").lower()
+
+    def test_shell_run_requires_wait_ms(self, shell_session_id):
+        """Test ShellRunTool requires wait_ms"""
+        start_tool = ShellStartTool()
+        start_tool.execute(session_id=shell_session_id)
+
+        run_tool = ShellRunTool(get_outputs_dir())
+        result = run_tool.execute(
+            session_id=shell_session_id,
+            command="echo 'missing wait'",
+            wait_ms=None,
+        )
+
+        assert result["success"] is False
+        assert "wait_ms" in result.get("error", "")
 
 
 class TestMultipleShellSessions:
@@ -202,13 +237,12 @@ class TestMultipleShellSessions:
                 assert result["success"] is True
 
             # Run different commands in each session
-            run_tool = ShellRunTool()
+            run_tool = ShellRunTool(get_outputs_dir())
             for i, session_id in enumerate(session_ids):
                 result = run_tool.execute(
                     session_id=session_id,
                     command=f"echo 'session_{i}'",
                     wait_ms=3000,
-                    background=False,
                 )
                 assert result["success"] is True
                 assert f"session_{i}" in result["stdout"]
@@ -227,12 +261,11 @@ class TestCrossPlatformCompatibility:
         start_tool = ShellStartTool()
         start_tool.execute(session_id=shell_session_id)
 
-        run_tool = ShellRunTool()
+        run_tool = ShellRunTool(get_outputs_dir())
         result = run_tool.execute(
             session_id=shell_session_id,
             command='python -c "print(\'cross-platform-test\')"',
             wait_ms=5000,
-            background=False,
         )
 
         assert result["success"] is True
@@ -253,12 +286,11 @@ class TestCrossPlatformCompatibility:
             start_tool = ShellStartTool()
             start_tool.execute(session_id=shell_session_id)
 
-            run_tool = ShellRunTool()
+            run_tool = ShellRunTool(get_outputs_dir())
             result = run_tool.execute(
                 session_id=shell_session_id,
                 command="echo test_cmd",
                 wait_ms=5000,
-                background=False,
             )
 
             assert result["success"] is True
@@ -274,12 +306,11 @@ class TestCrossPlatformCompatibility:
         start_tool = ShellStartTool()
         start_tool.execute(session_id=shell_session_id)
 
-        run_tool = ShellRunTool()
+        run_tool = ShellRunTool(get_outputs_dir())
         result = run_tool.execute(
             session_id=shell_session_id,
             command="echo 'unix-test' | cat",
             wait_ms=5000,
-            background=False,
         )
 
         assert result["success"] is True

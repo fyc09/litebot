@@ -6,10 +6,24 @@ import threading
 import time
 import uuid
 import shutil
+from pathlib import Path
 from collections import deque
 from typing import Any, Dict, Optional, Deque, Tuple, List
 from .base import BaseTool, BaseToolGroup, BaseStatus
 from ..config import settings
+
+
+MAX_INLINE_OUTPUT_CHARS = 1000
+OUTPUT_HINT = (
+    "Command output saved to file and exceeds 1000 characters. "
+    "Use shell_run with grep/head/tail to read the file, for example: "
+    "`cat <file> | grep -B 3 -A 3 \"pattern\"` or `head -n 200 <file>` "
+    "or `tail -n 200 <file>`."
+)
+TIMEOUT_HINT = (
+    "Command timed out before completion. Use shell_read with a longer wait_ms "
+    "to continue waiting for output."
+)
 
 
 def _detect_shell_type() -> str:
@@ -249,16 +263,55 @@ class ShellSession:
 _shell_sessions: Dict[str, ShellSession] = {}
 
 
+def _save_shell_output(
+    outputs_dir: Path,
+    session_id: str,
+    command: str,
+    stdout: str,
+    stderr: str,
+) -> str:
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    token = uuid.uuid4().hex[:8]
+    filename = f"shell-{timestamp}-{session_id}-{token}.log"
+    output_path = outputs_dir / filename
+    content = (
+        f"session_id: {session_id}\n"
+        f"command: {command}\n"
+        "\n"
+        "--- stdout ---\n"
+        f"{stdout}"
+        "\n"
+        "--- stderr ---\n"
+        f"{stderr}"
+    )
+    output_path.write_text(content, encoding="utf-8", errors="replace")
+    return str(output_path)
+
+
+def _tail_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
+
+
+def _format_inline_output(stdout: str, stderr: str) -> str:
+    if stderr:
+        if stdout:
+            return f"{stdout}\n--- stderr ---\n{stderr}"
+        return f"--- stderr ---\n{stderr}"
+    return stdout
+
+
 def _collect_output_until_marker(
     session: ShellSession,
     marker: str,
     wait_ms: int,
     max_chars: int,
-) -> Tuple[str, str, bool]:
+) -> Tuple[str, str, bool, bool]:
     """
     Collect output from session until marker is found or timeout.
     
-    Returns: (stdout, stderr, marker_found)
+    Returns: (stdout, stderr, marker_found, timed_out)
     """
     max_wait_time = wait_ms if wait_ms > 0 else 100000
     start_time = time.time() * 1000
@@ -266,6 +319,7 @@ def _collect_output_until_marker(
     all_stderr = []
     marker_found = False
     accumulated_stdout = ""
+    timed_out = False
 
     while (time.time() * 1000 - start_time) < max_wait_time:
         output = session.read(wait_ms=100, max_chars=max_chars)
@@ -274,9 +328,6 @@ def _collect_output_until_marker(
 
         if stdout_chunk:
             accumulated_stdout += stdout_chunk
-
-        if stderr_chunk:
-            all_stderr.append(stderr_chunk)
 
         # Check for marker in accumulated output
         if accumulated_stdout:
@@ -288,6 +339,9 @@ def _collect_output_until_marker(
                 session.clear_running_marker()
                 break
 
+        if stderr_chunk:
+            all_stderr.append(stderr_chunk)
+
         if not stdout_chunk and not stderr_chunk:
             time.sleep(0.01)
 
@@ -295,7 +349,10 @@ def _collect_output_until_marker(
     if accumulated_stdout:
         all_stdout.append(accumulated_stdout)
 
-    return "".join(all_stdout), "".join(all_stderr), marker_found
+    if not marker_found and (time.time() * 1000 - start_time) >= max_wait_time:
+        timed_out = True
+
+    return "".join(all_stdout), "".join(all_stderr), marker_found, timed_out
 
 
 def _ensure_session(session_id: str, working_dir: Optional[str] = None) -> ShellSession:
@@ -364,13 +421,16 @@ class ShellStartTool(BaseTool):
 class ShellRunTool(BaseTool):
     """Run a command in a shell session"""
 
+    def __init__(self, outputs_dir: Path):
+        self.outputs_dir = outputs_dir
+
     @property
     def name(self) -> str:
         return "shell_run"
 
     @property
     def description(self) -> str:
-        return "Run a command in a persistent shell session (bash or cmd). **IMPORTANT**: If 'background' is set to true, the command will run in the background and the tool will return immediately. This will occupy the shell session; start a new session for other commands."
+        return "Run a command in a persistent shell session (bash or cmd)."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -387,25 +447,19 @@ class ShellRunTool(BaseTool):
                 },
                 "wait_ms": {
                     "type": "integer",
-                    "description": "Max wait time in milliseconds for command completion",
-                    "default": 10000,
+                    "description": "Max wait time in milliseconds for command completion (min 3000)",
                 },
                 "max_chars": {
                     "type": "integer",
                     "description": "Max characters to return from buffered output",
                     "default": 20000,
                 },
-                "background": {
-                    "type": "boolean",
-                    "description": "Run command in background and return immediately. **IMPORTANT** This will occupy the shell session; start a new session for other commands.",
-                    "default": False,
-                },
                 "working_dir": {
                     "type": "string",
                     "description": "Working directory to start shell (optional)",
                 },
             },
-            "required": ["command", "background"],
+            "required": ["command", "wait_ms"],
         }
 
     def execute(
@@ -414,7 +468,6 @@ class ShellRunTool(BaseTool):
         session_id: Optional[str] = None,
         wait_ms: Optional[int] = None,
         max_chars: int = 20000,
-        background: bool = False,
         working_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         session_id = session_id or "default"
@@ -429,7 +482,14 @@ class ShellRunTool(BaseTool):
             }
 
         if wait_ms is None:
-            wait_ms = 10000 if background else 100000
+            return {
+                "success": False,
+                "session_id": session_id,
+                "error": "wait_ms is required and must be at least 3000ms.",
+            }
+
+        if wait_ms < 3000:
+            wait_ms = 3000
 
         marker = f"__CMD_DONE_{uuid.uuid4().hex[:8]}__"
         
@@ -439,37 +499,61 @@ class ShellRunTool(BaseTool):
         session.write(command)
         session.write(f"echo {marker}")
 
-        if background:
-            # For background mode, wait for marker with a reasonable timeout
-            # If marker is found, command completed and marker will be cleared
-            # If marker is not found, command is still running, keep marker set
-            # (is_running() will check buffer for marker before rejecting new commands)
-            stdout, stderr, marker_found = _collect_output_until_marker(
-                session, marker, wait_ms, max_chars
-            )
-            
-            status = "completed" if marker_found else "running"
-            
+        # Wait until completion or timeout
+        max_wait_time = wait_ms if wait_ms > 0 else 100000
+        stdout, stderr, marker_found, timed_out = _collect_output_until_marker(
+            session, marker, max_wait_time, max_chars
+        )
+
+        end_reason = "completed" if marker_found else "timeout"
+        output_path = _save_shell_output(
+            self.outputs_dir, session_id, command, stdout, stderr
+        )
+
+        inline_output = _format_inline_output(stdout, stderr)
+        size_exceeded = len(inline_output) > MAX_INLINE_OUTPUT_CHARS
+
+        if size_exceeded and timed_out:
             return {
-                "success": True,
+                "success": False,
                 "session_id": session_id,
-                "status": status,
+                "end_reason": end_reason,
+                "stdout": _tail_text(inline_output, MAX_INLINE_OUTPUT_CHARS),
+                "stderr": "",
+                "output_path": output_path,
+                "error": f"{OUTPUT_HINT} {TIMEOUT_HINT}",
+            }
+
+        if size_exceeded:
+            return {
+                "success": False,
+                "session_id": session_id,
+                "end_reason": end_reason,
+                "stdout": _tail_text(inline_output, MAX_INLINE_OUTPUT_CHARS),
+                "stderr": "",
+                "output_path": output_path,
+                "error": OUTPUT_HINT,
+            }
+
+        if timed_out:
+            return {
+                "success": False,
+                "session_id": session_id,
+                "end_reason": end_reason,
                 "stdout": stdout,
                 "stderr": stderr,
+                "output_path": output_path,
+                "error": TIMEOUT_HINT,
             }
-        else:
-            # For normal mode, wait until completion or timeout
-            max_wait_time = wait_ms if wait_ms > 0 else 100000
-            stdout, stderr, marker_found = _collect_output_until_marker(
-                session, marker, max_wait_time, max_chars
-            )
-            
-            return {
-                "success": True,
-                "session_id": session_id,
-                "stdout": stdout,
-                "stderr": stderr,
-            }
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "end_reason": end_reason,
+            "stdout": stdout,
+            "stderr": stderr,
+            "output_path": output_path,
+        }
 
 
 class ShellWriteTool(BaseTool):
@@ -522,6 +606,9 @@ class ShellWriteTool(BaseTool):
 class ShellReadTool(BaseTool):
     """Read output from a shell session"""
 
+    def __init__(self, outputs_dir: Path):
+        self.outputs_dir = outputs_dir
+
     @property
     def name(self) -> str:
         return "shell_read"
@@ -541,8 +628,7 @@ class ShellReadTool(BaseTool):
                 },
                 "wait_ms": {
                     "type": "integer",
-                    "description": "Wait time in milliseconds before reading output",
-                    "default": 0,
+                    "description": "Wait time in milliseconds before reading output (min 3000)",
                 },
                 "max_chars": {
                     "type": "integer",
@@ -554,24 +640,47 @@ class ShellReadTool(BaseTool):
                     "description": "Working directory to start shell (optional)",
                 },
             },
-            "required": [],
+            "required": ["wait_ms"],
         }
 
     def execute(
         self,
+        wait_ms: int,
         session_id: Optional[str] = None,
-        wait_ms: int = 0,
         max_chars: int = 20000,
         working_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
         session_id = session_id or "default"
         session = _ensure_session(session_id, working_dir=working_dir)
-        default_wait_ms = wait_ms if wait_ms > 0 else 1000
+        if wait_ms < 3000:
+            wait_ms = 3000
+        default_wait_ms = wait_ms
         output = session.read(wait_ms=default_wait_ms, max_chars=max_chars)
+        stdout = output.get("stdout", "")
+        stderr = output.get("stderr", "")
+        output_path = _save_shell_output(
+            self.outputs_dir, session_id, "shell_read", stdout, stderr
+        )
+
+        inline_output = _format_inline_output(stdout, stderr)
+        if len(inline_output) > MAX_INLINE_OUTPUT_CHARS:
+            return {
+                "success": False,
+                "session_id": session_id,
+                "end_reason": "completed",
+                "stdout": _tail_text(inline_output, MAX_INLINE_OUTPUT_CHARS),
+                "stderr": "",
+                "output_path": output_path,
+                "error": OUTPUT_HINT,
+            }
+
         return {
             "success": True,
             "session_id": session_id,
-            **output,
+            "end_reason": "completed",
+            "stdout": stdout,
+            "stderr": stderr,
+            "output_path": output_path,
         }
 
 
@@ -619,6 +728,9 @@ class ShellStopTool(BaseTool):
 class ShellToolGroup(BaseToolGroup):
     """Shell tool group"""
 
+    def __init__(self, outputs_dir: Path):
+        self.outputs_dir = outputs_dir
+
     @property
     def name(self) -> str:
         return "shell"
@@ -630,9 +742,9 @@ class ShellToolGroup(BaseToolGroup):
     def get_tools(self) -> List[BaseTool]:
         return [
             ShellStartTool(),
-            ShellRunTool(),
+            ShellRunTool(self.outputs_dir),
             ShellWriteTool(),
-            ShellReadTool(),
+            ShellReadTool(self.outputs_dir),
             ShellStopTool(),
         ]
 

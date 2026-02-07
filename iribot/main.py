@@ -304,7 +304,6 @@ def health_check():
 # Serve frontend static files
 static_dir = Path(__file__).parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
-print(static_dir)
 app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
 

@@ -1,5 +1,6 @@
 """Tool executor and registry"""
 from typing import Any, Dict, List
+from pathlib import Path
 from .tools.base import BaseTool, BaseToolGroup, BaseStatus
 from .tools.execute_command import ShellToolGroup, ShellStatus
 from .tools.read_file import ReadFileTool
@@ -13,9 +14,15 @@ class ToolExecutor:
     """Manages and executes tools"""
 
     def __init__(self):
+        self.outputs_dir = self._ensure_outputs_dir()
         self.tools: Dict[str, BaseTool] = {}
         self.statuses: Dict[str, BaseStatus] = {}
         self._register_default_tools()
+
+    def _ensure_outputs_dir(self) -> Path:
+        outputs_dir = Path.cwd() / "outputs"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        return outputs_dir
 
     def _register_default_tools(self) -> None:
         """Register all default tools"""
@@ -28,7 +35,7 @@ class ToolExecutor:
         for tool in default_tools:
             self.register_tool(tool)
 
-        self.register_tool_group(ShellToolGroup())
+        self.register_tool_group(ShellToolGroup(self.outputs_dir))
         self.register_status(ShellStatus())
         self.register_status(SkillsStatus())
     
