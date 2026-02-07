@@ -208,9 +208,9 @@ class TestShellTools:
 
         run_tool = ShellRunTool(get_outputs_dir())
         command = (
-            "python -c \"import subprocess, sys, time; "
+            "python -c \"import subprocess, sys; "
             "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
-            "print(p.pid); sys.stdout.flush(); time.sleep(60)\""
+            "print(p.pid, flush=True)\""
         )
         result = run_tool.execute(
             session_id=shell_session_id,
@@ -219,7 +219,8 @@ class TestShellTools:
         )
 
         pid_line = None
-        for line in result.get("stdout", "").splitlines():
+        output_text = result.get("stdout", "") + result.get("stderr", "")
+        for line in output_text.splitlines():
             if line.strip().isdigit():
                 pid_line = line.strip()
                 break
