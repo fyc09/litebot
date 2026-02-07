@@ -1,5 +1,6 @@
 """Main FastAPI application"""
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -18,12 +19,21 @@ from .models import (
 from .session_manager import session_manager
 from .agent import agent
 from .executor import tool_executor
+from .tools.execute_command import stop_all_shell_sessions
 from .prompt_generator import generate_system_prompt
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    tool_executor.register_shutdown_handler(stop_all_shell_sessions)
+    yield
+    tool_executor.run_shutdown_handlers()
+
 
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.app_title,
-    debug=settings.debug
+    debug=settings.debug,
+    lifespan=lifespan,
 )
 
 # Add CORS middleware

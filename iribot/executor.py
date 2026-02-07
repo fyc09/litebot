@@ -1,5 +1,5 @@
 """Tool executor and registry"""
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Callable
 from pathlib import Path
 from .tools.base import BaseTool, BaseToolGroup, BaseStatus
 from .tools.execute_command import ShellToolGroup, ShellStatus
@@ -17,6 +17,7 @@ class ToolExecutor:
         self.outputs_dir = self._ensure_outputs_dir()
         self.tools: Dict[str, BaseTool] = {}
         self.statuses: Dict[str, BaseStatus] = {}
+        self._shutdown_handlers: List[Callable[[], None]] = []
         self._register_default_tools()
 
     def _ensure_outputs_dir(self) -> Path:
@@ -52,6 +53,15 @@ class ToolExecutor:
     def register_status(self, status: BaseStatus) -> None:
         """Register a status-only entry"""
         self.statuses[status.name] = status
+
+    def register_shutdown_handler(self, handler: Callable[[], None]) -> None:
+        """Register a function to run on shutdown"""
+        self._shutdown_handlers.append(handler)
+
+    def run_shutdown_handlers(self) -> None:
+        """Run all registered shutdown handlers"""
+        for handler in self._shutdown_handlers:
+            handler()
     
     def execute_tool(self, tool_name: str, **kwargs) -> Dict[str, Any]:
         """Execute a registered tool"""

@@ -1,14 +1,8 @@
 1. <DONE> 修复 linux 上当返回的内容结尾没有换行时无法正确获得结果
 2. <DONE> 添加 Windows CMD 支持
 3. <SUSPENDED> 可视化配置界面
-4. 添加 Agent Skills
-    * skills 保存在cwd下的skills目录中，每个目录都是一个skill，目录名就是skill的名字，具体的skill是一个 Markdown 文件，SKILL.md
-    * 仅提供一个tool用于根据关键词查找skill，返回skill相关的信息。
-    * 一个SKILL中可能会有指向其他md文件的，这些文件也应该能够被视为skill，但是不应该出现在查找skill的结果中
-        * 例如存在 aaa/SKILL.md aaa/bbb.md(aaa/bbb/SKILL.md 是等价的) 其中aaa提到了 bbb，那么在查找skill时只会返回 aaa 相关的信息，但是当使用 aaa skill 后，agent 可以通过 aaa/bbb 这个id访问到 bbb.md 的内容。
-        * 在prompt中说明skill是保存在本地的md文件（说明具体位置），但是一般不允许直接访问这些文件，必须通过 skill 工具访问，当这些目录中包含脚本时，需要前往对应目录运行脚本。
-    * 提供一个工具用于使用 skill，返回内容是skill的内容（功能上等价于一个cat工具）
-    * 不需要提供下载、安装、删除技能的tool
+4. <DONE> 添加 Agent Skills
 5. prompt 优化
 6. <DONE> 编写 pytest，用于测试 tools，并编写 workflow 在各个平台自动运行（bash on Linux/MacOS, cmd on Windows, bash on Windows）
-7. 自动结束shell的子进程
+7. <DONE> 自动结束shell的子进程
+8. 文件上传下载

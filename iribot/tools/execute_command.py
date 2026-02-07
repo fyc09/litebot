@@ -298,6 +298,15 @@ class ShellSession:
 _shell_sessions: Dict[str, ShellSession] = {}
 
 
+def stop_all_shell_sessions() -> None:
+    session_ids = list(_shell_sessions.keys())
+    for session_id in session_ids:
+        session = _shell_sessions.get(session_id)
+        if session and session.is_alive():
+            session.terminate()
+    _shell_sessions.clear()
+
+
 def _save_shell_output(
     outputs_dir: Path,
     session_id: str,
