@@ -3,6 +3,7 @@ import pytest
 import time
 import platform
 import subprocess
+import re
 from pathlib import Path
 from iribot.tools.execute_command import (
     ShellStartTool,
@@ -228,14 +229,10 @@ class TestShellTools:
             f"output_path={result.get('output_path')}\n"
         )
 
-        pid_line = None
-        for line in result.get("stdout", "").splitlines():
-            if line.strip().isdigit():
-                pid_line = line.strip()
-                break
-
-        assert pid_line is not None, debug_context
-        child_pid = int(pid_line)
+        stdout_text = result.get("stdout", "")
+        pid_matches = re.findall(r"\b(\d+)\b", stdout_text)
+        assert pid_matches, debug_context
+        child_pid = int(pid_matches[-1])
         assert is_pid_running(child_pid), (
             debug_context + f"child_pid={child_pid} not running after spawn\n"
         )
