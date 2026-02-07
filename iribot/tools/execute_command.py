@@ -2,6 +2,7 @@
 import os
 import subprocess
 import platform
+import signal
 import threading
 import time
 import uuid
@@ -116,6 +117,7 @@ class ShellSession:
             text=False,  # Use binary mode to avoid line buffering issues
             bufsize=0,  # Unbuffered
             env=env,
+            start_new_session=(platform.system() != "Windows"),
         )
 
         self._stdout_thread = threading.Thread(
@@ -203,8 +205,41 @@ class ShellSession:
         }
 
     def terminate(self) -> None:
-        if self.is_alive():
-            self.process.terminate()
+        if not self.process or not self.is_alive():
+            return
+
+        pid = self.process.pid
+        if platform.system() == "Windows":
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
+            except Exception:
+                self.process.terminate()
+        else:
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except Exception:
+                self.process.terminate()
+
+        try:
+            self.process.wait(timeout=5)
+        except Exception:
+            try:
+                if platform.system() == "Windows":
+                    subprocess.run(
+                        ["taskkill", "/PID", str(pid), "/T", "/F"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    )
+                else:
+                    os.killpg(pid, signal.SIGKILL)
+            except Exception:
+                self.process.kill()
 
     def get_log(self) -> list:
         with self._lock:

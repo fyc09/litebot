@@ -2,6 +2,7 @@
 import pytest
 import time
 import platform
+import subprocess
 from pathlib import Path
 from iribot.tools.execute_command import (
     ShellStartTool,
@@ -19,6 +20,34 @@ def get_outputs_dir() -> Path:
     outputs_dir = Path.cwd() / "outputs"
     outputs_dir.mkdir(parents=True, exist_ok=True)
     return outputs_dir
+
+
+def is_pid_running(pid: int) -> bool:
+    if platform.system() == "Windows":
+        result = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return str(pid) in result.stdout
+
+    result = subprocess.run(
+        ["ps", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def wait_for_pid_exit(pid: int, timeout: float = 5.0) -> bool:
+    start = time.time()
+    while time.time() - start < timeout:
+        if not is_pid_running(pid):
+            return True
+        time.sleep(0.1)
+    return not is_pid_running(pid)
 
 
 class TestShellDetection:
@@ -171,6 +200,38 @@ class TestShellTools:
 
         assert result["success"] is True
         assert result["status"] == "stopped"
+
+    def test_shell_stop_kills_child_process(self, shell_session_id):
+        """Ensure shell_stop terminates child processes"""
+        start_tool = ShellStartTool()
+        start_tool.execute(session_id=shell_session_id)
+
+        run_tool = ShellRunTool(get_outputs_dir())
+        command = (
+            "python -c \"import subprocess, sys, time; "
+            "p = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)']); "
+            "print(p.pid); sys.stdout.flush(); time.sleep(60)\""
+        )
+        result = run_tool.execute(
+            session_id=shell_session_id,
+            command=command,
+            wait_ms=5000,
+        )
+
+        pid_line = None
+        for line in result.get("stdout", "").splitlines():
+            if line.strip().isdigit():
+                pid_line = line.strip()
+                break
+
+        assert pid_line is not None
+        child_pid = int(pid_line)
+        assert is_pid_running(child_pid)
+
+        stop_tool = ShellStopTool()
+        stop_tool.execute(session_id=shell_session_id)
+
+        assert wait_for_pid_exit(child_pid, timeout=5.0)
 
     def test_shell_run_background_command(self, shell_session_id):
         """Test running command in background"""
