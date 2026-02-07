@@ -219,30 +219,16 @@ class TestShellTools:
             wait_ms=5000,
         )
 
-        debug_context = (
-            "shell_stop_kills_child_process debug\n"
-            f"session_id={shell_session_id}\n"
-            f"command={command}\n"
-            f"success={result.get('success')} end_reason={result.get('end_reason')}\n"
-            f"stdout=\n{result.get('stdout', '')}\n"
-            f"stderr=\n{result.get('stderr', '')}\n"
-            f"output_path={result.get('output_path')}\n"
-        )
-
         stdout_text = result.get("stdout", "")
         pid_matches = re.findall(r"\b(\d+)\b", stdout_text)
-        assert pid_matches, debug_context
+        assert pid_matches
         child_pid = int(pid_matches[-1])
-        assert is_pid_running(child_pid), (
-            debug_context + f"child_pid={child_pid} not running after spawn\n"
-        )
+        assert is_pid_running(child_pid)
 
         stop_tool = ShellStopTool()
         stop_tool.execute(session_id=shell_session_id)
 
-        assert wait_for_pid_exit(child_pid, timeout=5.0), (
-            debug_context + f"child_pid={child_pid} did not exit after shell_stop\n"
-        )
+        assert wait_for_pid_exit(child_pid, timeout=5.0)
 
     def test_shell_run_background_command(self, shell_session_id):
         """Test running command in background"""
