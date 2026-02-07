@@ -5,8 +5,9 @@ A full-featured AI agent application with tool calling capabilities and real-tim
 ## 🚀 Quick Start
 
 - Install: `pip install iridet-bot`
-- Run: `iribot`
+- Find an empty directory for the agent, and run: `iribot`
 - To specify host and port: `iribot --host 0.0.0.0 --port 8080`
+- (Optional, Recommended) Copy some skills to `skills` directory
 
 ## ✨ Key Features
 
