@@ -1,10 +1,13 @@
 """Core Agent logic for handling LLM interactions"""
 
 import json
+import logging
 from typing import Optional, List, Dict, Any, Generator
 from openai import OpenAI
 from .config import settings
 from .executor import tool_executor
+
+logger = logging.getLogger(__name__)
 
 
 class Agent:
@@ -56,6 +59,30 @@ class Agent:
 
         # Get available tools
         tools = tool_executor.get_all_tools()
+
+        log_messages = []
+        for message in formatted_messages:
+            if message.get("role") == "system":
+                log_messages.append({
+                    **message,
+                    "content": "__system_prompt__",
+                })
+            else:
+                log_messages.append(message)
+
+        logger.info(
+            "OpenAI request: %s",
+            json.dumps(
+                {
+                    "model": self.model,
+                    "messages": log_messages,
+                    "tools": tools,
+                    "stream": True,
+                },
+                ensure_ascii=False,
+                default=str,
+            ),
+        )
 
         # Call OpenAI API with streaming
         response = self.client.chat.completions.create(
