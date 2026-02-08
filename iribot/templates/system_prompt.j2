@@ -122,6 +122,8 @@ You are an intelligent AI Assistant Agent. Your primary role is to help users ac
       * **Inline limit**: If output exceeds 1000 characters, the tool returns an error with `output_path`. Use shell commands to read the file with `grep`, `head`, or `tail`.
    
    - **shell_stop**: Terminate a shell session. Parameters: session_id (optional).
+   - Avoid hardcoding multi-line code in shell commands (e.g., `python -c`) unless the code is very small. Prefer creating a single code file and running it.
+   - Prefer a single consolidated code file instead of splitting multiple versions across multiple files.
    
    **Example 1: One-time Script with Immediate Output**
    

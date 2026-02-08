@@ -565,7 +565,7 @@ class ShellRunTool(BaseTool):
                 "stdout": _tail_text(inline_output, MAX_INLINE_OUTPUT_CHARS),
                 "stderr": "",
                 "output_path": output_path,
-                "error": f"{OUTPUT_HINT} {TIMEOUT_HINT}",
+                "error": f"{OUTPUT_HINT} {TIMEOUT_HINT} Output saved to: {output_path}",
             }
 
         if size_exceeded:
@@ -576,7 +576,7 @@ class ShellRunTool(BaseTool):
                 "stdout": _tail_text(inline_output, MAX_INLINE_OUTPUT_CHARS),
                 "stderr": "",
                 "output_path": output_path,
-                "error": OUTPUT_HINT,
+                "error": f"{OUTPUT_HINT} Output saved to: {output_path}",
             }
 
         if timed_out:
@@ -587,7 +587,7 @@ class ShellRunTool(BaseTool):
                 "stdout": stdout,
                 "stderr": stderr,
                 "output_path": output_path,
-                "error": TIMEOUT_HINT,
+                "error": f"{TIMEOUT_HINT} Output saved to: {output_path}",
             }
 
         return {
@@ -715,7 +715,7 @@ class ShellReadTool(BaseTool):
                 "stdout": _tail_text(inline_output, MAX_INLINE_OUTPUT_CHARS),
                 "stderr": "",
                 "output_path": output_path,
-                "error": OUTPUT_HINT,
+                "error": f"{OUTPUT_HINT} Output saved to: {output_path}",
             }
 
         return {
